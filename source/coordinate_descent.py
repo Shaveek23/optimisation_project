@@ -21,10 +21,11 @@ class CoordinateDescent:
         self.path = None
         self.m = None
         self.n = None
+        self.costs = None
         self.intercept = intercept
         self.lambda_ = lambda_
 
-    def fit(self, X, y, iters=100, tol=1e-12):
+    def fit(self, X, y, iters=1000, tol=1e-12, method = 'cyclic'):
 
         self.X = np.array(X.copy())
         self.y = np.array(y.copy())
@@ -32,9 +33,23 @@ class CoordinateDescent:
         theta = np.zeros(self.n)
         path = theta.copy()
 
+
+        cost = np.power(self.X @ np.zeros((self.n, 1)) - y, 2).sum()
+        costs = [cost]
+
+        i = 0
+        last = 0
+
         for _ in tqdm(range(iters)):
             theta_new = theta.copy()
-            for j in range(self.n):
+
+            if method in ('cyclic', 'randomized'):
+
+                if method == 'cyclic':
+                    j = (i % self.n)
+                elif method == 'randomized':
+                    j = np.random.choice(range(self.n))
+
                 X_j = np.hstack((self.X[:, :j], self.X[:, (j + 1):]))
                 theta_j = np.hstack((theta[:j], theta[(j + 1):])).reshape((-1, 1))
 
@@ -46,13 +61,47 @@ class CoordinateDescent:
                 else:
                     theta_new[j] = soft_thresholding(rho_j, self.lambda_) / z_j
 
-                path = np.vstack((path, theta_new.copy()))
+                if max(abs(theta_new - theta)) < tol:
+                    if (method == 'cyclic') or (last > 2*self.n):
+                        break
+                    elif method == 'randomized':
+                        last += 1
+                else:
+                    theta = theta_new
+                    last = 0
 
-            if max(abs(theta_new - theta)) < tol:
-                break
-            else:
-                theta = theta_new
+            elif method == 'greedy':
 
+                for j in range(self.n):
+
+                    X_j = np.hstack((self.X[:, :j], self.X[:, (j + 1):]))
+                    theta_j = np.hstack((theta[:j], theta[(j + 1):])).reshape((-1, 1))
+
+                    rho_j = (self.X[:, j:(j + 1)] * (self.y - X_j @ theta_j)).sum()
+                    z_j = np.power(self.X[:, j], 2).sum()
+
+                    if self.intercept:
+                        theta_new[j] = soft_thresholding(rho_j, self.lambda_) / z_j if j != 0 else rho_j
+                    else:
+                        theta_new[j] = soft_thresholding(rho_j, self.lambda_) / z_j
+
+                diffs = np.abs(theta_new - theta)
+                indx = np.where(diffs == diffs.max())
+
+                if diffs.max() < tol:
+                    break
+
+                theta[indx] = theta_new[indx]
+
+            path = np.vstack((path, theta_new.copy()))
+
+            cost = np.power(self.X @ theta.reshape((self.n, 1)) - y, 2).sum()
+            cost += np.abs(theta_new[1:]).sum() if self.intercept else np.abs(theta_new).sum()
+            costs.append(cost)
+
+            i += 1
+
+        self.costs = np.array(costs)
         self.path = path
         self.theta = theta
 
