@@ -61,11 +61,16 @@ class CoordinateDescent:
                 else:
                     theta_new[j] = soft_thresholding(rho_j, self.lambda_) / z_j
 
-                if max(abs(theta_new - theta)) < tol:
-                    if (method == 'cyclic') or (last > 2*self.n):
+                if abs(theta_new[j] - theta[j]) < tol:
+
+                    last += 1
+
+                    if (method == 'cyclic') and (last >= self.n):
                         break
-                    elif method == 'randomized':
-                        last += 1
+
+                    if (method == 'randomized') and (last >= 2*self.n):
+                        break
+
                 else:
                     theta = theta_new
                     last = 0
@@ -96,7 +101,7 @@ class CoordinateDescent:
             path = np.vstack((path, theta_new.copy()))
 
             cost = np.power(self.X @ theta.reshape((self.n, 1)) - y, 2).sum()
-            cost += np.abs(theta_new[1:]).sum() if self.intercept else np.abs(theta_new).sum()
+            cost += self.lambda_*(np.abs(theta_new[1:]).sum()) if self.intercept else self.lambda_*(np.abs(theta_new).sum())
             costs.append(cost)
 
             i += 1
