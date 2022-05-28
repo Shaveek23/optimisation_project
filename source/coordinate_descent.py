@@ -25,16 +25,21 @@ class CoordinateDescent:
         self.intercept = intercept
         self.lambda_ = lambda_
 
-    def fit(self, X, y, iters=1000, tol=1e-12, method = 'cyclic'):
+    def fit(self, X, y, iters=1000, tol=1e-12, method = 'cyclic', initial_guess = None):
 
         self.X = np.array(X.copy())
         self.y = np.array(y.copy())
         self.m, self.n = X.shape
-        theta = np.zeros(self.n)
+        if initial_guess is not None:
+            theta = initial_guess.copy()
+        else:
+            theta = np.zeros(self.n)
         path = theta.copy()
 
 
-        cost = np.power(self.X @ np.zeros((self.n, 1)) - y, 2).sum()
+        #cost = np.power(self.X @ np.zeros((self.n, 1)) - y, 2).sum()
+        cost = np.power(self.X @ theta.reshape((-1, 1)) - y, 2).sum()
+        cost += self.lambda_*(np.abs(theta[1:]).sum()) if self.intercept else self.lambda_*(np.abs(theta).sum())
         costs = [cost]
 
         i = 0
